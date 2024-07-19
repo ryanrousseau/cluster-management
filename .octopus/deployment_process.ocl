@@ -4,32 +4,17 @@ step "generate-suffix" {
     action {
         action_type = "Octopus.TerraformApply"
         properties = {
+            Octopus.Action.GitRepository.Source = "Project"
             Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
             Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
             Octopus.Action.Terraform.AllowPluginDownloads = "True"
             Octopus.Action.Terraform.AzureAccount = "False"
             Octopus.Action.Terraform.GoogleCloudAccount = "False"
             Octopus.Action.Terraform.ManagedAccount = "None"
             Octopus.Action.Terraform.PlanJsonOutput = "False"
             Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
-            Octopus.Action.Terraform.Template = <<-EOT
-                terraform {
-                
-                }
-                
-                resource "random_string" "suffix" {
-                  length = 5
-                  special = false
-                  upper = false
-                }
-                
-                
-                output "suffix" {
-                  value =  random_string.suffix.result
-                }
-                EOT
-            Octopus.Action.Terraform.TemplateParameters = "{}"
+            Octopus.Action.Terraform.TemplateDirectory = "suffix"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
@@ -48,138 +33,17 @@ step "create-cluster-with-rancher" {
         action_type = "Octopus.TerraformApply"
         properties = {
             Octopus.Action.AzureAccount.Variable = "Project.Azure.Account"
+            Octopus.Action.GitRepository.Source = "Project"
             Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
             Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
             Octopus.Action.Terraform.AllowPluginDownloads = "True"
             Octopus.Action.Terraform.AzureAccount = "True"
             Octopus.Action.Terraform.GoogleCloudAccount = "False"
             Octopus.Action.Terraform.ManagedAccount = "None"
             Octopus.Action.Terraform.PlanJsonOutput = "False"
             Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
-            Octopus.Action.Terraform.Template = <<-EOT
-                terraform {
-                  backend "azurerm" {
-                    resource_group_name  = "#{Platform.Azure.ResourceGroup.Demo}"
-                    storage_account_name = "#{Platform.Azure.StorageAccountName}"
-                    container_name       = "#{Platform.Azure.ContainerName}"
-                    key                  = "#{Project.Terraform.Cluster.Key}"
-                  }
-                
-                  required_providers {
-                    rancher2 = {
-                      source = "rancher/rancher2"
-                    }
-                  }
-                }
-                
-                provider "azurerm" {
-                   features {}
-                }
-                
-                provider "rancher2" {
-                  api_url = var.rancher_url
-                  token_key = var.rancher_token
-                }
-                
-                variable "rancher_url" {
-                  type = string
-                  default = "#{Platform.Rancher.Url}"
-                }
-                
-                variable "rancher_token" {
-                  type = string
-                  default = "#{Project.Rancher.Token}"
-                }
-                
-                variable "resource_group_name" {
-                  type = string
-                  default = "#{Project.Cluster.ResourceGroup}"
-                }
-                
-                variable "location" {
-                  type = string
-                  default = "#{Project.Cluster.Location}"
-                }
-                
-                variable "cluster_name" {
-                  type = string
-                  default = "#{Project.Cluster.Name}"
-                }
-                
-                variable "kubernetes_version" {
-                  type = string
-                  default = "1.29.0"
-                }
-                
-                variable "client_id" {
-                  type = string
-                  default = "#{Project.Azure.Account.Client}"
-                }
-                
-                variable "client_secret" {
-                  type = string
-                  default = "#{Project.Azure.Account.Password}"
-                  sensitive = true
-                }
-                
-                variable "subscription_id" {
-                  type = string
-                  default = "#{Project.Azure.Account.SubscriptionNumber}"
-                }
-                
-                variable "tenant_id" {
-                  type = string
-                  default = "#{Project.Azure.Account.TenantId}"
-                }
-                
-                resource "random_string" "pool_name" {
-                  length = 10
-                  special = false
-                  upper = false
-                }
-                
-                resource "rancher2_cloud_credential" "azure_cloud_credentials" {
-                  name = "${var.cluster_name}-creds"
-                  azure_credential_config {
-                    client_id = var.client_id
-                    client_secret = var.client_secret
-                    subscription_id = var.subscription_id
-                    tenant_id = var.tenant_id
-                  }
-                }
-                
-                resource "rancher2_cluster" "cluster_az" {
-                  name         = var.cluster_name
-                  description  = "Terraform"
-                  
-                  aks_config_v2 {
-                    cloud_credential_id = rancher2_cloud_credential.azure_cloud_credentials.id
-                    name = var.cluster_name
-                    resource_group = var.resource_group_name
-                    resource_location = var.location
-                    kubernetes_version = var.kubernetes_version
-                    dns_prefix = var.cluster_name
-                    network_plugin = "kubenet"
-                    node_pools {
-                      availability_zones = ["1", "2", "3"]
-                      name = "p${random_string.pool_name.result}"
-                      count = 1
-                      enable_auto_scaling = true
-                      min_count = 1
-                      max_count = 5
-                      orchestrator_version = var.kubernetes_version
-                      os_disk_size_gb = 128
-                      vm_size = "Standard_D2_v2"
-                    }
-                  }
-                }
-                
-                output "cluster_id" {
-                  value =  rancher2_cluster.cluster_az.id
-                }
-                EOT
-            Octopus.Action.Terraform.TemplateParameters = "{\"rancher_url\":\"#{Platform.Rancher.Url}\",\"rancher_token\":\"#{Project.Rancher.Token}\",\"resource_group_name\":\"#{Project.Cluster.ResourceGroup}\",\"location\":\"#{Project.Cluster.Location}\",\"cluster_name\":\"#{Project.Cluster.Name}\",\"kubernetes_version\":\"1.29.2\",\"client_id\":\"#{Project.Azure.Account.Client}\",\"client_secret\":\"#{Project.Azure.Account.Password}\",\"subscription_id\":\"#{Project.Azure.Account.SubscriptionNumber}\",\"tenant_id\":\"#{Project.Azure.Account.TenantId}\"}"
+            Octopus.Action.Terraform.TemplateDirectory = "cluster"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
@@ -237,6 +101,7 @@ step "include-new-cluster" {
             Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsErrors"
             Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
             Octopus.Action.HealthCheck.Type = "FullHealthCheck"
+            Octopus.Action.RunOnServer = "false"
         }
     }
 }
@@ -507,6 +372,7 @@ step "manual-intervention-required" {
         properties = {
             Octopus.Action.Manual.BlockConcurrentDeployments = "False"
             Octopus.Action.Manual.Instructions = "Approve this step once the cluster is ready to be the active cluster."
+            Octopus.Action.RunOnServer = "false"
         }
     }
 }
