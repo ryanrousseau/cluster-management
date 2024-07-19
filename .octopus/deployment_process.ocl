@@ -1,0 +1,594 @@
+step "generate-suffix" {
+    name = "Generate suffix"
+
+    action {
+        action_type = "Octopus.TerraformApply"
+        properties = {
+            Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
+            Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Terraform.AllowPluginDownloads = "True"
+            Octopus.Action.Terraform.AzureAccount = "False"
+            Octopus.Action.Terraform.GoogleCloudAccount = "False"
+            Octopus.Action.Terraform.ManagedAccount = "None"
+            Octopus.Action.Terraform.PlanJsonOutput = "False"
+            Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
+            Octopus.Action.Terraform.Template = <<-EOT
+                terraform {
+                
+                }
+                
+                resource "random_string" "suffix" {
+                  length = 5
+                  special = false
+                  upper = false
+                }
+                
+                
+                output "suffix" {
+                  value =  random_string.suffix.result
+                }
+                EOT
+            Octopus.Action.Terraform.TemplateParameters = "{}"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopuslabs/terraform-workertools:1.5.2"
+        }
+    }
+}
+
+step "create-cluster-with-rancher" {
+    name = "Create cluster with Rancher"
+
+    action {
+        action_type = "Octopus.TerraformApply"
+        properties = {
+            Octopus.Action.AzureAccount.Variable = "Project.Azure.Account"
+            Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
+            Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Terraform.AllowPluginDownloads = "True"
+            Octopus.Action.Terraform.AzureAccount = "True"
+            Octopus.Action.Terraform.GoogleCloudAccount = "False"
+            Octopus.Action.Terraform.ManagedAccount = "None"
+            Octopus.Action.Terraform.PlanJsonOutput = "False"
+            Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
+            Octopus.Action.Terraform.Template = <<-EOT
+                terraform {
+                  backend "azurerm" {
+                    resource_group_name  = "#{Platform.Azure.ResourceGroup.Demo}"
+                    storage_account_name = "#{Platform.Azure.StorageAccountName}"
+                    container_name       = "#{Platform.Azure.ContainerName}"
+                    key                  = "#{Project.Terraform.Cluster.Key}"
+                  }
+                
+                  required_providers {
+                    rancher2 = {
+                      source = "rancher/rancher2"
+                    }
+                  }
+                }
+                
+                provider "azurerm" {
+                   features {}
+                }
+                
+                provider "rancher2" {
+                  api_url = var.rancher_url
+                  token_key = var.rancher_token
+                }
+                
+                variable "rancher_url" {
+                  type = string
+                  default = "#{Platform.Rancher.Url}"
+                }
+                
+                variable "rancher_token" {
+                  type = string
+                  default = "#{Project.Rancher.Token}"
+                }
+                
+                variable "resource_group_name" {
+                  type = string
+                  default = "#{Project.Cluster.ResourceGroup}"
+                }
+                
+                variable "location" {
+                  type = string
+                  default = "#{Project.Cluster.Location}"
+                }
+                
+                variable "cluster_name" {
+                  type = string
+                  default = "#{Project.Cluster.Name}"
+                }
+                
+                variable "kubernetes_version" {
+                  type = string
+                  default = "1.29.0"
+                }
+                
+                variable "client_id" {
+                  type = string
+                  default = "#{Project.Azure.Account.Client}"
+                }
+                
+                variable "client_secret" {
+                  type = string
+                  default = "#{Project.Azure.Account.Password}"
+                  sensitive = true
+                }
+                
+                variable "subscription_id" {
+                  type = string
+                  default = "#{Project.Azure.Account.SubscriptionNumber}"
+                }
+                
+                variable "tenant_id" {
+                  type = string
+                  default = "#{Project.Azure.Account.TenantId}"
+                }
+                
+                resource "random_string" "pool_name" {
+                  length = 10
+                  special = false
+                  upper = false
+                }
+                
+                resource "rancher2_cloud_credential" "azure_cloud_credentials" {
+                  name = "${var.cluster_name}-creds"
+                  azure_credential_config {
+                    client_id = var.client_id
+                    client_secret = var.client_secret
+                    subscription_id = var.subscription_id
+                    tenant_id = var.tenant_id
+                  }
+                }
+                
+                resource "rancher2_cluster" "cluster_az" {
+                  name         = var.cluster_name
+                  description  = "Terraform"
+                  
+                  aks_config_v2 {
+                    cloud_credential_id = rancher2_cloud_credential.azure_cloud_credentials.id
+                    name = var.cluster_name
+                    resource_group = var.resource_group_name
+                    resource_location = var.location
+                    kubernetes_version = var.kubernetes_version
+                    dns_prefix = var.cluster_name
+                    network_plugin = "kubenet"
+                    node_pools {
+                      availability_zones = ["1", "2", "3"]
+                      name = "p${random_string.pool_name.result}"
+                      count = 1
+                      enable_auto_scaling = true
+                      min_count = 1
+                      max_count = 5
+                      orchestrator_version = var.kubernetes_version
+                      os_disk_size_gb = 128
+                      vm_size = "Standard_D2_v2"
+                    }
+                  }
+                }
+                
+                output "cluster_id" {
+                  value =  rancher2_cluster.cluster_az.id
+                }
+                EOT
+            Octopus.Action.Terraform.TemplateParameters = "{\"rancher_url\":\"#{Platform.Rancher.Url}\",\"rancher_token\":\"#{Project.Rancher.Token}\",\"resource_group_name\":\"#{Project.Cluster.ResourceGroup}\",\"location\":\"#{Project.Cluster.Location}\",\"cluster_name\":\"#{Project.Cluster.Name}\",\"kubernetes_version\":\"1.29.2\",\"client_id\":\"#{Project.Azure.Account.Client}\",\"client_secret\":\"#{Project.Azure.Account.Password}\",\"subscription_id\":\"#{Project.Azure.Account.SubscriptionNumber}\",\"tenant_id\":\"#{Project.Azure.Account.TenantId}\"}"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopuslabs/terraform-workertools:1.5.2"
+        }
+    }
+}
+
+step "register-cluster-with-octopus" {
+    name = "Register cluster with Octopus"
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $clusterId = $OctopusParameters["Project.Rancher.Cluster.Id"]
+                $release = $OctopusParameters["Octopus.Release.Number"]
+                
+                $name = $OctopusParameters["Project.Cluster.Name"]
+                $clusterUrl = $OctopusParameters["Project.Cluster.Url"]
+                $roles = "octopub,cm,cm-candidate,cm-$release"
+                $accountName = $OctopusParameters["Project.Cluster.Account.Name"]
+                $workerPoolName = "Hosted Ubuntu"
+                $feedName = "Docker Hub"
+                $image = $OctopusParameters["Platform.WorkerImage.WorkerTools"]
+                
+                New-OctopusKubernetesTarget -name $name `
+                  -clusterUrl $clusterUrl `
+                  -octopusRoles $roles `
+                  -octopusAccountIdOrName $accountName `
+                  -octopusDefaultWorkerPoolIdOrName $workerPoolName `
+                  -healthCheckContainerImageFeedIdOrName $feedName `
+                  -healthCheckContainerImage $image `
+                  -updateIfExisting
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool = "hosted-ubuntu"
+    }
+}
+
+step "include-new-cluster" {
+    name = "Include new cluster"
+    properties = {
+        Octopus.Action.TargetRoles = "cm-candidate"
+    }
+
+    action {
+        action_type = "Octopus.HealthCheck"
+        properties = {
+            Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsErrors"
+            Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
+            Octopus.Action.HealthCheck.Type = "FullHealthCheck"
+        }
+    }
+}
+
+step "install-nginx-aks" {
+    name = "Install nginx (AKS)"
+    properties = {
+        Octopus.Action.TargetRoles = "cm-candidate"
+    }
+
+    action {
+        action_type = "Octopus.HelmChartUpgrade"
+        properties = {
+            Octopus.Action.Helm.AdditionalArgs = "--create-namespace"
+            Octopus.Action.Helm.ClientVersion = "V3"
+            Octopus.Action.Helm.Namespace = "ingress-nginx"
+            Octopus.Action.Helm.ReleaseName = "ingress-nginx"
+            Octopus.Action.Helm.ResetValues = "True"
+            Octopus.Action.Helm.YamlValues = <<-EOT
+                controller:
+                  service:
+                    type: LoadBalancer
+                    annotations: {
+                      service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /healthz
+                    }
+                    externalTrafficPolicy: Local
+                  extraArgs:
+                    update-status: "true"
+                EOT
+            Octopus.Action.Package.DownloadOnTentacle = "False"
+            Octopus.Action.Package.FeedId = "ingress-nginx"
+            Octopus.Action.Package.PackageId = "ingress-nginx"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopusdeploy/worker-tools:5.1.0-ubuntu.22.04"
+        }
+
+        packages {
+            acquisition_location = "Server"
+            feed = "ingress-nginx"
+            package_id = "ingress-nginx"
+            properties = {
+                SelectionMode = "immediate"
+            }
+        }
+    }
+}
+
+step "wait-for-nginx-rollout" {
+    name = "Wait for nginx rollout"
+    properties = {
+        Octopus.Action.TargetRoles = "cm-candidate"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.Script.ScriptBody = "kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=90s"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "Bash"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopuslabs/k8s-workertools:latest"
+        }
+    }
+}
+
+step "get-external-ip" {
+    name = "Get external IP"
+    properties = {
+        Octopus.Action.TargetRoles = "cm-candidate"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                kubectl get service ingress-nginx-controller --namespace=ingress-nginx
+                
+                ip=$(kubectl get service ingress-nginx-controller --namespace=ingress-nginx -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
+                echo "ip=$ip"
+                
+                while [ -z "$ip" ]
+                do
+                  sleep 5
+                  ip=$(kubectl get service ingress-nginx-controller --namespace=ingress-nginx -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
+                  echo "ip=$ip"
+                done
+                
+                set_octopusvariable "IP" $ip
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "Bash"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopusdeploy/worker-tools:5.1.0-ubuntu.22.04"
+        }
+    }
+}
+
+step "create-dns-record" {
+    name = "Create DNS record"
+
+    action {
+        action_type = "Octopus.TerraformApply"
+        properties = {
+            Octopus.Action.AzureAccount.Variable = "Project.Azure.Account"
+            Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
+            Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Terraform.AllowPluginDownloads = "True"
+            Octopus.Action.Terraform.AzureAccount = "True"
+            Octopus.Action.Terraform.GoogleCloudAccount = "False"
+            Octopus.Action.Terraform.ManagedAccount = "None"
+            Octopus.Action.Terraform.PlanJsonOutput = "False"
+            Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
+            Octopus.Action.Terraform.Template = <<-EOT
+                terraform {
+                  backend "azurerm" {
+                    resource_group_name  = "#{Platform.Azure.ResourceGroup.Demo}"
+                    storage_account_name = "#{Platform.Azure.StorageAccountName}"
+                    container_name       = "#{Platform.Azure.ContainerName}"
+                    key                  = "#{Project.Terraform.DNS.Key}"
+                  }
+                }
+                
+                provider "azurerm" {
+                  skip_provider_registration = "true"
+                  features {}
+                }
+                
+                variable "resource_group" {
+                  type        = string
+                  default     = "#{Platform.Azure.ResourceGroup.Shared}"
+                }
+                
+                variable "dns_zone_name" {
+                  type        = string
+                  default     = "#{Platform.DNS.ZoneName}"
+                }
+                
+                variable "dns_records" {
+                  type        = list(string)
+                  default     = ["1.2.3.4", "1.2.3.5"]
+                }
+                
+                variable "dns_ttl" {
+                  type        = number
+                  default     = "#{Platform.DNS.TTL}"
+                }
+                
+                resource "azurerm_dns_a_record" "record" {
+                  name                = "#{Project.Cluster.Name}"
+                  resource_group_name = var.resource_group
+                  zone_name           = var.dns_zone_name
+                  ttl                 = var.dns_ttl
+                  records             = var.dns_records
+                }
+                EOT
+            Octopus.Action.Terraform.TemplateParameters = "{\"resource_group\":\"octopus-shared-resources\",\"dns_zone_name\":\"Octopussamples.com\",\"dns_records\":\"[\\n  \\\"#{Project.Output.IP}\\\"\\n]\",\"dns_ttl\":\"#{Platform.DNS.TTL}\"}"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "#{Platform.WorkerImage.Terraform}"
+        }
+    }
+}
+
+step "install-cert-manager-crds" {
+    name = "Install cert manager crds"
+    properties = {
+        Octopus.Action.TargetRoles = "cm-candidate"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesRunScript"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.2/cert-manager.crds.yaml
+                
+                # Add the Jetstack Helm repository
+                helm repo add jetstack https://charts.jetstack.io
+                
+                # Update your local Helm chart repository cache
+                helm repo update
+                
+                # Install the cert-manager Helm chart
+                helm install cert-manager jetstack/cert-manager \
+                  --namespace cert-manager \
+                  --create-namespace \
+                  --version v1.12.0
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "Bash"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopusdeploy/worker-tools:5.1.0-ubuntu.22.04"
+        }
+    }
+}
+
+step "create-an-issuer" {
+    name = "Create an issuer"
+    properties = {
+        Octopus.Action.TargetRoles = "cm-candidate"
+    }
+
+    action {
+        action_type = "Octopus.KubernetesDeployRawYaml"
+        properties = {
+            Octopus.Action.Kubernetes.DeploymentTimeout = "6000"
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "False"
+            Octopus.Action.Kubernetes.ServerSideApply.Enabled = "False"
+            Octopus.Action.Kubernetes.ServerSideApply.ForceConflicts = "False"
+            Octopus.Action.KubernetesContainers.CustomResourceYaml = <<-EOT
+                apiVersion: cert-manager.io/v1
+                kind: ClusterIssuer
+                metadata:
+                  name: letsencrypt
+                spec:
+                  acme:
+                    server: https://acme-v02.api.letsencrypt.org/directory
+                    email: advice@octopus.com
+                    privateKeySecretRef:
+                      name: letsencrypt
+                    solvers:
+                      - http01:
+                          ingress:
+                            class: nginx
+                EOT
+            Octopus.Action.KubernetesContainers.DeploymentWait = "NoWait"
+            Octopus.Action.Script.ScriptSource = "Inline"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopusdeploy/worker-tools:5.1.0-ubuntu.22.04"
+        }
+    }
+}
+
+step "manual-intervention-required" {
+    name = "Approve the cluster swap"
+
+    action "approve-the-cluster-swap" {
+        action_type = "Octopus.Manual"
+        properties = {
+            Octopus.Action.Manual.BlockConcurrentDeployments = "False"
+            Octopus.Action.Manual.Instructions = "Approve this step once the cluster is ready to be the active cluster."
+        }
+    }
+}
+
+step "swap-clusters-in-load-balancer" {
+    name = "Swap clusters in load balancer"
+
+    action {
+        action_type = "Octopus.AzurePowerShell"
+        is_disabled = true
+        properties = {
+            Octopus.Action.Azure.AccountId = "octofx-azure-subscription"
+            Octopus.Action.Script.ScriptBody = "Write-Host \"Swapping clusters\""
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopusdeploy/worker-tools:6.2.1-ubuntu.22.04"
+        }
+    }
+}
+
+step "swap-roles-on-clusters" {
+    name = "Swap roles on clusters"
+    properties = {
+        Octopus.Action.TargetRoles = "cm"
+    }
+
+    action {
+        action_type = "Octopus.Script"
+        properties = {
+            Octopus.Action.Script.ScriptBody = <<-EOT
+                $ErrorActionPreference = "Stop";
+                
+                # Define working variables
+                $octopusURL = $OctopusParameters["Octopus.Web.ServerUri"]
+                $octopusAPIKey = $OctopusParameters["Project.Octopus.ApiKey"]
+                $header = @{ "X-Octopus-ApiKey" = $octopusAPIKey; "Content-Type" = "text/json" }
+                $spaceId = $OctopusParameters["Octopus.Space.Id"]
+                $machineId = $OctopusParameters["Octopus.Machine.Id"]
+                
+                # Get space
+                $space = (Invoke-RestMethod -Method Get -Uri "$octopusURL/api/spaces/all" -Headers $header) | Where-Object {$_.Name -eq $spaceName}
+                
+                # Get machine
+                $machine = (Invoke-RestMethod -Method Get -Uri "$octopusURL/api/$spaceId/machines/$machineId" -Headers $header)
+                
+                $roleToAdd = ""
+                $roleToRemove = ""
+                
+                if ($machine.Roles -Contains "cm-inactive") {
+                  Write-Host "found tag cm-inactive, moving to cm-to-destroy"
+                  $roleToRemove = "cm-inactive"
+                  $roleToAdd = "cm-to-destroy"
+                }
+                elseif ($machine.Roles -Contains "cm-active") {
+                  Write-Host "found tag cm-active, moving to cm-to-inactive"
+                  $roleToRemove = "cm-active"
+                  $roleToAdd = "cm-inactive"
+                }
+                elseif ($machine.Roles -Contains "cm-candidate") {
+                  Write-Host "found tag cm-candidate, moving to cm-to-active"
+                  $roleToRemove = "cm-candidate"
+                  $roleToAdd = "cm-active"
+                }
+                else {
+                  Write-Host "Found no matching tags, exiting"
+                  exit 0
+                }
+                
+                $machine.Roles = $machine.Roles | Where-Object { $_ -ne $roleToRemove }
+                $machine.Roles += $roleToAdd
+                
+                Invoke-RestMethod -Method Put -Uri "$octopusURL/api/$spaceId/machines/$machineId" -Body ($machine | ConvertTo-Json -Depth 10) -Headers $header
+                EOT
+            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.Syntax = "PowerShell"
+        }
+        worker_pool = "hosted-ubuntu"
+    }
+}

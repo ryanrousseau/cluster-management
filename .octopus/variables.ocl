@@ -1,0 +1,104 @@
+variable "Project.Azure.Account" {
+    type = "AzureAccount"
+
+    value "octofx-azure-subscription" {}
+}
+
+variable "Project.Cluster.Account.Name" {
+    value "Octopus Deploy Rancher token" {}
+}
+
+variable "Project.Cluster.Location" {
+    value "westus2" {
+        description = ""
+        environment = ["production"]
+    }
+
+    value "southcentralus" {
+        environment = ["development", "test"]
+    }
+}
+
+variable "Project.Cluster.Name" {
+    value "wrg-#{Octopus.Environment.Name | ToLower}-#{Project.Cluster.Suffix}" {}
+}
+
+variable "Project.Cluster.Region" {
+    value "south central us" {}
+}
+
+variable "Project.Cluster.ResourceGroup" {
+    value "demo.octopus.app" {}
+}
+
+variable "Project.Cluster.Suffix" {
+    value "#{Octopus.Action[Generate suffix].Output.TerraformValueOutputs[suffix]}" {}
+}
+
+variable "Project.Cluster.Url" {
+    value "https://rancher.octopussamples.com/k8s/clusters/#{Project.Rancher.Cluster.Id}" {}
+}
+
+variable "Project.DNS.Token" {
+    value {}
+}
+
+variable "Project.Output.IP" {
+    value "#{Octopus.Action[Get external IP].Output.IP}" {}
+}
+
+variable "Project.Rancher.CloudCredentialId" {
+    value "cc-jl745" {}
+}
+
+variable "Project.Rancher.Cluster.Id" {
+    value "#{Octopus.Action[Create cluster with Rancher].Output.TerraformValueOutputs[cluster_id]}" {}
+}
+
+variable "Project.Terraform.Cluster.Key" {
+    value "#{Project.Cluster.Name}.terraform.tfstate" {}
+}
+
+variable "Project.Terraform.DNS.Key" {
+    value "#{Project.Cluster.Name}-dns.terraform.tfstate" {}
+}
+
+variable "Project.Terraform.Variables[client_id]" {
+    value "#{Project.Azure.Account.Client}" {}
+}
+
+variable "Project.Terraform.Variables[client_secret]" {
+    value "#{Project.Azure.Account.Password}" {}
+}
+
+variable "Project.Terraform.Variables[cluster_name]" {
+    value "#{Project.Cluster.Name}" {}
+}
+
+variable "Project.Terraform.Variables[kubernetes_version]" {
+    value "1.29.2" {}
+}
+
+variable "Project.Terraform.Variables[location]" {
+    value "#{Project.Cluster.Location}" {}
+}
+
+variable "Project.Terraform.Variables[rancher_token]" {
+    value "#{Project.Rancher.Token}" {}
+}
+
+variable "Project.Terraform.Variables[rancher_url]" {
+    value "#{Platform.Rancher.Url}" {}
+}
+
+variable "Project.Terraform.Variables[resource_group_name]" {
+    value "#{Project.Cluster.ResourceGroup}" {}
+}
+
+variable "Project.Terraform.Variables[subscription_id]" {
+    value "#{Project.Azure.Account.SubscriptionNumber}" {}
+}
+
+variable "Project.Terraform.Variables[tenant_id]" {
+    value "#{Project.Azure.Account.TenantId}" {}
+}
