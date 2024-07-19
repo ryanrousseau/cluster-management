@@ -14,7 +14,7 @@ step "generate-suffix" {
             Octopus.Action.Terraform.ManagedAccount = "None"
             Octopus.Action.Terraform.PlanJsonOutput = "False"
             Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
-            Octopus.Action.Terraform.TemplateDirectory = "suffix"
+            Octopus.Action.Terraform.TemplateDirectory = "terraform/suffix"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
@@ -43,7 +43,7 @@ step "create-cluster-with-rancher" {
             Octopus.Action.Terraform.ManagedAccount = "None"
             Octopus.Action.Terraform.PlanJsonOutput = "False"
             Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
-            Octopus.Action.Terraform.TemplateDirectory = "cluster"
+            Octopus.Action.Terraform.TemplateDirectory = "terraform/cluster"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
