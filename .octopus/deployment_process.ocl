@@ -61,29 +61,9 @@ step "register-cluster-with-octopus" {
     action {
         action_type = "Octopus.Script"
         properties = {
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $clusterId = $OctopusParameters["Project.Rancher.Cluster.Id"]
-                $release = $OctopusParameters["Octopus.Release.Number"]
-                
-                $name = $OctopusParameters["Project.Cluster.Name"]
-                $clusterUrl = $OctopusParameters["Project.Cluster.Url"]
-                $roles = "octopub,cm,cm-candidate,cm-$release"
-                $accountName = $OctopusParameters["Project.Cluster.Account.Name"]
-                $workerPoolName = "Hosted Ubuntu"
-                $feedName = "Docker Hub"
-                $image = $OctopusParameters["Platform.WorkerImage.WorkerTools"]
-                
-                New-OctopusKubernetesTarget -name $name `
-                  -clusterUrl $clusterUrl `
-                  -octopusRoles $roles `
-                  -octopusAccountIdOrName $accountName `
-                  -octopusDefaultWorkerPoolIdOrName $workerPoolName `
-                  -healthCheckContainerImageFeedIdOrName $feedName `
-                  -healthCheckContainerImage $image `
-                  -updateIfExisting
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.GitRepository.Source = "Project"
+            Octopus.Action.Script.ScriptFileName = "scripts/register-cluster-with-octopus.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool = "hosted-ubuntu"
     }
@@ -163,9 +143,9 @@ step "wait-for-nginx-rollout" {
     action {
         action_type = "Octopus.KubernetesRunScript"
         properties = {
-            Octopus.Action.Script.ScriptBody = "kubectl rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=90s"
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "Bash"
+            Octopus.Action.GitRepository.Source = "Project"
+            Octopus.Action.Script.ScriptFileName = "scripts/wait-for-nginx-rollout.sh"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
@@ -221,59 +201,17 @@ step "create-dns-record" {
         action_type = "Octopus.TerraformApply"
         properties = {
             Octopus.Action.AzureAccount.Variable = "Project.Azure.Account"
+            Octopus.Action.GitRepository.Source = "Project"
             Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
             Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
             Octopus.Action.Terraform.AllowPluginDownloads = "True"
             Octopus.Action.Terraform.AzureAccount = "True"
             Octopus.Action.Terraform.GoogleCloudAccount = "False"
             Octopus.Action.Terraform.ManagedAccount = "None"
             Octopus.Action.Terraform.PlanJsonOutput = "False"
             Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
-            Octopus.Action.Terraform.Template = <<-EOT
-                terraform {
-                  backend "azurerm" {
-                    resource_group_name  = "#{Platform.Azure.ResourceGroup.Demo}"
-                    storage_account_name = "#{Platform.Azure.StorageAccountName}"
-                    container_name       = "#{Platform.Azure.ContainerName}"
-                    key                  = "#{Project.Terraform.DNS.Key}"
-                  }
-                }
-                
-                provider "azurerm" {
-                  skip_provider_registration = "true"
-                  features {}
-                }
-                
-                variable "resource_group" {
-                  type        = string
-                  default     = "#{Platform.Azure.ResourceGroup.Shared}"
-                }
-                
-                variable "dns_zone_name" {
-                  type        = string
-                  default     = "#{Platform.DNS.ZoneName}"
-                }
-                
-                variable "dns_records" {
-                  type        = list(string)
-                  default     = ["1.2.3.4", "1.2.3.5"]
-                }
-                
-                variable "dns_ttl" {
-                  type        = number
-                  default     = "#{Platform.DNS.TTL}"
-                }
-                
-                resource "azurerm_dns_a_record" "record" {
-                  name                = "#{Project.Cluster.Name}"
-                  resource_group_name = var.resource_group
-                  zone_name           = var.dns_zone_name
-                  ttl                 = var.dns_ttl
-                  records             = var.dns_records
-                }
-                EOT
-            Octopus.Action.Terraform.TemplateParameters = "{\"resource_group\":\"octopus-shared-resources\",\"dns_zone_name\":\"Octopussamples.com\",\"dns_records\":\"[\\n  \\\"#{Project.Output.IP}\\\"\\n]\",\"dns_ttl\":\"#{Platform.DNS.TTL}\"}"
+            Octopus.Action.Terraform.TemplateDirectory = "terraform/dns"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
@@ -331,6 +269,8 @@ step "create-an-issuer" {
     action {
         action_type = "Octopus.KubernetesDeployRawYaml"
         properties = {
+            Octopus.Action.GitRepository.FilePathFilters = "yaml/issuer.yaml"
+            Octopus.Action.GitRepository.Source = "Project"
             Octopus.Action.Kubernetes.DeploymentTimeout = "6000"
             Octopus.Action.Kubernetes.ResourceStatusCheck = "False"
             Octopus.Action.Kubernetes.ServerSideApply.Enabled = "False"
@@ -351,8 +291,9 @@ step "create-an-issuer" {
                           ingress:
                             class: nginx
                 EOT
+            Octopus.Action.KubernetesContainers.CustomResourceYamlFileName = "yaml/issuer.yaml"
             Octopus.Action.KubernetesContainers.DeploymentWait = "NoWait"
-            Octopus.Action.Script.ScriptSource = "Inline"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
@@ -408,52 +349,9 @@ step "swap-roles-on-clusters" {
     action {
         action_type = "Octopus.Script"
         properties = {
-            Octopus.Action.Script.ScriptBody = <<-EOT
-                $ErrorActionPreference = "Stop";
-                
-                # Define working variables
-                $octopusURL = $OctopusParameters["Octopus.Web.ServerUri"]
-                $octopusAPIKey = $OctopusParameters["Project.Octopus.ApiKey"]
-                $header = @{ "X-Octopus-ApiKey" = $octopusAPIKey; "Content-Type" = "text/json" }
-                $spaceId = $OctopusParameters["Octopus.Space.Id"]
-                $machineId = $OctopusParameters["Octopus.Machine.Id"]
-                
-                # Get space
-                $space = (Invoke-RestMethod -Method Get -Uri "$octopusURL/api/spaces/all" -Headers $header) | Where-Object {$_.Name -eq $spaceName}
-                
-                # Get machine
-                $machine = (Invoke-RestMethod -Method Get -Uri "$octopusURL/api/$spaceId/machines/$machineId" -Headers $header)
-                
-                $roleToAdd = ""
-                $roleToRemove = ""
-                
-                if ($machine.Roles -Contains "cm-inactive") {
-                  Write-Host "found tag cm-inactive, moving to cm-to-destroy"
-                  $roleToRemove = "cm-inactive"
-                  $roleToAdd = "cm-to-destroy"
-                }
-                elseif ($machine.Roles -Contains "cm-active") {
-                  Write-Host "found tag cm-active, moving to cm-to-inactive"
-                  $roleToRemove = "cm-active"
-                  $roleToAdd = "cm-inactive"
-                }
-                elseif ($machine.Roles -Contains "cm-candidate") {
-                  Write-Host "found tag cm-candidate, moving to cm-to-active"
-                  $roleToRemove = "cm-candidate"
-                  $roleToAdd = "cm-active"
-                }
-                else {
-                  Write-Host "Found no matching tags, exiting"
-                  exit 0
-                }
-                
-                $machine.Roles = $machine.Roles | Where-Object { $_ -ne $roleToRemove }
-                $machine.Roles += $roleToAdd
-                
-                Invoke-RestMethod -Method Put -Uri "$octopusURL/api/$spaceId/machines/$machineId" -Body ($machine | ConvertTo-Json -Depth 10) -Headers $header
-                EOT
-            Octopus.Action.Script.ScriptSource = "Inline"
-            Octopus.Action.Script.Syntax = "PowerShell"
+            Octopus.Action.GitRepository.Source = "Project"
+            Octopus.Action.Script.ScriptFileName = "scripts/swap-cluster-tags.ps1"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
         }
         worker_pool = "hosted-ubuntu"
     }
