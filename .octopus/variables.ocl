@@ -101,6 +101,11 @@ variable "Project.Terraform.Variables[rancher_url]" {
 
 variable "Project.Terraform.Variables[resource_group_name]" {
     value "#{Project.Cluster.ResourceGroup}" {}
+
+    value "#{Platform.Azure.ResourceGroup.Shared}" {
+        action = ["create-dns-record"]
+        description = ""
+    }
 }
 
 variable "Project.Terraform.Variables[subscription_id]" {
