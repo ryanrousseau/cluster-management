@@ -72,7 +72,7 @@ step "register-cluster-with-octopus" {
 step "include-new-cluster" {
     name = "Include new cluster"
     properties = {
-        Octopus.Action.TargetRoles = "cm"
+        Octopus.Action.TargetRoles = "cm,cm-candidate"
     }
 
     action {
