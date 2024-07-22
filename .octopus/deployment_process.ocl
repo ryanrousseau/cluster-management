@@ -343,7 +343,7 @@ step "swap-clusters-in-load-balancer" {
 step "swap-roles-on-clusters" {
     name = "Swap roles on clusters"
     properties = {
-        Octopus.Action.TargetRoles = "cm-candidate,cm"
+        Octopus.Action.TargetRoles = "cm-candidate"
     }
 
     action {
