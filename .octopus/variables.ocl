@@ -83,10 +83,6 @@ variable "Project.Terraform.Variables[dns_ttl]" {
     value "#{Platform.DNS.TTL}" {}
 }
 
-variable "Project.Terraform.Variables[dns_zone_name]" {
-    value "#{Platform.DNS.TTL}" {}
-}
-
 variable "Project.Terraform.Variables[kubernetes_version]" {
     value "1.29.2" {}
 }
@@ -113,4 +109,8 @@ variable "Project.Terraform.Variables[subscription_id]" {
 
 variable "Project.Terraform.Variables[tenant_id]" {
     value "#{Project.Azure.Account.TenantId}" {}
+}
+
+variable "Project.Terraform.Variables[dns_zone_name]" {
+    value "#{Platform.DNS.ZoneName}" {}
 }
