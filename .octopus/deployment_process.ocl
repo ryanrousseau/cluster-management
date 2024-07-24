@@ -26,6 +26,35 @@ step "generate-suffix" {
     }
 }
 
+step "plan-to-create-cluster" {
+    name = "Plan to create cluster"
+
+    action {
+        action_type = "Octopus.TerraformPlan"
+        properties = {
+            Octopus.Action.AzureAccount.Variable = "Project.Azure.Account"
+            Octopus.Action.GitRepository.Source = "Project"
+            Octopus.Action.GoogleCloud.ImpersonateServiceAccount = "False"
+            Octopus.Action.GoogleCloud.UseVMServiceAccount = "True"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
+            Octopus.Action.Terraform.AllowPluginDownloads = "True"
+            Octopus.Action.Terraform.AzureAccount = "True"
+            Octopus.Action.Terraform.GoogleCloudAccount = "False"
+            Octopus.Action.Terraform.ManagedAccount = "None"
+            Octopus.Action.Terraform.PlanJsonOutput = "False"
+            Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
+            Octopus.Action.Terraform.TemplateDirectory = "terraform/cluster"
+            OctopusUseBundledTooling = "False"
+        }
+        worker_pool = "hosted-ubuntu"
+
+        container {
+            feed = "docker-hub"
+            image = "octopuslabs/terraform-workertools:1.5.2"
+        }
+    }
+}
+
 step "create-cluster-with-rancher" {
     name = "Create cluster with Rancher"
 
