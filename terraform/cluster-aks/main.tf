@@ -43,7 +43,7 @@ variable "client_secret" {
 }
 
 variable "owner" {
-  type = "string"
+  type = string
   default = "demo.octopus.app"
 }
 
@@ -69,12 +69,9 @@ resource "azurerm_kubernetes_cluster" "default" {
   resource_group_name = var.resource_group_name
   kubernetes_version = var.kubernetes_version
   dns_prefix          = var.cluster_name
-  role_based_access_control {
-  	enabled = true
-  }
 
   default_node_pool {
-    name            = var.pool_name
+    name            = "p${random_string.pool_name.result}"
     node_count      = 1
     vm_size         = "Standard_D2_v2"
     enable_auto_scaling = true
@@ -88,7 +85,7 @@ resource "azurerm_kubernetes_cluster" "default" {
   }
 
   tags = {
-    owner = "${var.owner}"
+    owner = var.owner
     managed = "true"
     expires = "false"
   }
