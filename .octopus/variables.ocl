@@ -5,7 +5,7 @@ variable "Project.Azure.Account" {
 }
 
 variable "Project.Cluster.Account.Name" {
-    value "Octopus Deploy Rancher token" {}
+    value "demo.octopus.app" {}
 }
 
 variable "Project.Cluster.Location" {
@@ -51,8 +51,8 @@ variable "Project.Rancher.CloudCredentialId" {
     value "cc-jl745" {}
 }
 
-variable "Project.Rancher.Cluster.Id" {
-    value "#{Octopus.Action[Create cluster with Rancher].Output.TerraformValueOutputs[cluster_id]}" {}
+variable "Project.Terraform.Cluster.Id" {
+    value "#{Octopus.Action[Create cluster].Output.TerraformValueOutputs[cluster_id]}" {}
 }
 
 variable "Project.Terraform.Cluster.Key" {
