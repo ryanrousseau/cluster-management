@@ -75,10 +75,6 @@ variable "Project.Terraform.Variables[cluster_name]" {
     value "#{Project.Cluster.Name}" {}
 }
 
-variable "Project.Terraform.Variables[dns_records]" {
-    value "[\"1.2.3.4\", \"1.2.3.5\"]" {}
-}
-
 variable "Project.Terraform.Variables[dns_ttl]" {
     value "#{Platform.DNS.TTL}" {}
 }
@@ -122,4 +118,14 @@ variable "Project.Terraform.Variables[dns_zone_name]" {
 
 variable "Project.Octopus.ApiKey" {
     value "#{Global.Octopus.ApiKey}" {}
+}
+
+variable "Project.Terraform.Variables[dns_records]" {
+    value {
+        value = <<-EOT
+                [
+                  "#{Project.Output.IP}"
+                ]
+                EOT
+    }
 }
