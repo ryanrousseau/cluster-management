@@ -119,3 +119,7 @@ variable "Project.Terraform.Variables[tenant_id]" {
 variable "Project.Terraform.Variables[dns_zone_name]" {
     value "#{Platform.DNS.ZoneName}" {}
 }
+
+variable "Project.Octopus.ApiKey" {
+    value "#{Global.Octopus.ApiKey}" {}
+}
