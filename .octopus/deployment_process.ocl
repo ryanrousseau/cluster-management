@@ -43,7 +43,7 @@ step "plan-to-create-cluster" {
             Octopus.Action.Terraform.ManagedAccount = "None"
             Octopus.Action.Terraform.PlanJsonOutput = "False"
             Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
-            Octopus.Action.Terraform.TemplateDirectory = "terraform/cluster"
+            Octopus.Action.Terraform.TemplateDirectory = "terraform/cluster-aks"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
@@ -55,8 +55,8 @@ step "plan-to-create-cluster" {
     }
 }
 
-step "create-cluster-with-rancher" {
-    name = "Create cluster with Rancher"
+step "create-cluster" {
+    name = "Create cluster"
 
     action {
         action_type = "Octopus.TerraformApply"
@@ -72,7 +72,7 @@ step "create-cluster-with-rancher" {
             Octopus.Action.Terraform.ManagedAccount = "None"
             Octopus.Action.Terraform.PlanJsonOutput = "False"
             Octopus.Action.Terraform.RunAutomaticFileSubstitution = "True"
-            Octopus.Action.Terraform.TemplateDirectory = "terraform/cluster"
+            Octopus.Action.Terraform.TemplateDirectory = "terraform/cluster-aks"
             OctopusUseBundledTooling = "False"
         }
         worker_pool = "hosted-ubuntu"
