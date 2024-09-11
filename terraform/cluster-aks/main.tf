@@ -74,7 +74,7 @@ resource "azurerm_kubernetes_cluster" "default" {
     name            = "p${random_string.pool_name.result}"
     node_count      = 1
     vm_size         = "Standard_D2_v2"
-    enable_auto_scaling = true
+    auto_scaling_enabled = true
     min_count       = 1
     max_count       = 100
   }
