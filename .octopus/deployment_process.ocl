@@ -55,6 +55,18 @@ step "plan-to-create-cluster" {
     }
 }
 
+step "approve-plan" {
+    name = "Approve plan"
+
+    action {
+        action_type = "Octopus.Manual"
+        properties = {
+            Octopus.Action.Manual.BlockConcurrentDeployments = "True"
+            Octopus.Action.Manual.Instructions = "Approve the plan generated in the step above."
+        }
+    }
+}
+
 step "create-cluster" {
     name = "Create cluster"
 
