@@ -1,0 +1,44 @@
+name: Apply terraform
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  OCTOPUS_SPACE: White Rock Global
+
+jobs:
+  apply-terraform:
+    name: Apply terraform
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Login to Octopus Deploy 
+        uses: OctopusDeploy/login@v1
+        with: 
+          server: https://demo.octopus.app
+          service_account_id: 30026079-bb9c-4de1-8bbb-88d9c6b1f5be
+
+      - name: Set Version Number
+        id: version-generator
+        run: echo "version=$(date +'%Y.%m.%d').$GITHUB_RUN_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Create a release in Octopus Deploy 🐙
+        id: create-release
+        uses: OctopusDeploy/create-release-action@v3
+        with:
+          project: 'Cluster Management'
+          release_number: ${{ steps.version-generator.outputs.version }}
+
+      - uses: OctopusDeploy/deploy-release-action@v3
+        id: deploy-release-to-development
+        name: "Deploy release ${{ steps.version-generator.outputs.version }} to Development 🐙"
+        with:
+          project: 'Cluster Management'
+          release_number: ${{ steps.version-generator.outputs.version }}
+          environments: "Development"
