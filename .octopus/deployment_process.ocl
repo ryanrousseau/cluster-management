@@ -62,7 +62,12 @@ step "approve-plan" {
         action_type = "Octopus.Manual"
         properties = {
             Octopus.Action.Manual.BlockConcurrentDeployments = "True"
-            Octopus.Action.Manual.Instructions = "Approve the plan generated in the step above."
+            Octopus.Action.Manual.Instructions = <<-EOT
+                Approve the plan generated in the step above.
+                
+                #{Octopus.Action[Plan to create cluster].Output.TerraformPlanOutput}
+                EOT
+            Octopus.Action.RunOnServer = "false"
         }
     }
 }
